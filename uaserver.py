@@ -7,6 +7,8 @@ Clase (y programa principal) para un servidor de eco en UDP simple
 import socketserver
 import sys
 import os
+import xml.etree.ElementTree as ET
+from uaclient import WriteLogFich
 
 try:  # Tomamos la configuración de la conexión de un xml
     ConfigUA = sys.argv[1]
@@ -48,6 +50,9 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         else:
             self.wfile.write(b'SIP/2.0 405 Method Not Allowed\r\n\r\n')
 
+#Parámetros para lanzar el server
+ServerIP = CDicc['uaserver']['ip']
+ServerPort = int(CDicc['uaserver']['puerto'])
 
 if __name__ == "__main__":
     # Creamos servidor de eco y escuchamos

@@ -9,6 +9,7 @@ import sys
 import xml.etree.ElementTree as ET
 import time
 
+
 def WriteLogFich(fich, ip, port, event, message):
     """
     Función que transcribe el proceso de conexión en un fichero de texto
@@ -34,30 +35,33 @@ def WriteLogFich(fich, ip, port, event, message):
     elif event == 'Finishing':
         text = (Now + ' ' +  event + '.')
         Log.write(text)
-    Log.close()
-        
+    Log.close()        
+    
 
-
-# Parámetros para configuración y ejecuación del UA.
-try:
-    Method = sys.argv[2].upper()  # Método
-    Option = sys.argv[3]  # Su uso dependerá del Método
-    ConfigUA = sys.argv[1]
-    ConfigTree = ET.parse(ConfigUA)
-    ConfigRoot = ConfigTree.getroot()
-    CDicc = {}  # C = Config
-    for child in ConfigRoot:
-        CDicc[child.tag] = child.attrib      
-except IndexError:
-    print("Usage: python client.py config method option")
-
-ProxyIP = CDicc['regproxy']['ip']
-ProxyPort = int(CDicc['regproxy']['puerto'])
-LogFich = CDicc['log']['path']
-
-# Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
 if __name__ == "__main__":
-    """Se crea socket y se manda método al server"""
+    """
+    Toma parámetros para la configuración de la conexión de un xml
+    Se ata el socket a un proxy (servidor de registro)... UDP
+    Usa varios métodos de sesión SIP
+    """
+    
+    # Parámetros para configuración y ejecuación del UA.
+    try:
+        Method = sys.argv[2].upper()  # Método
+        Option = sys.argv[3]  # Su uso dependerá del Método
+        ConfigUA = sys.argv[1]
+        ConfigTree = ET.parse(ConfigUA)
+        ConfigRoot = ConfigTree.getroot()
+        CDicc = {}  # Diccionario doble con los parámetros
+        for child in ConfigRoot:
+            CDicc[child.tag] = child.attrib      
+    except IndexError:
+        print("Usage: python client.py config method option")
+    ProxyIP = CDicc['regproxy']['ip']
+    ProxyPort = int(CDicc['regproxy']['puerto'])
+    LogFich = CDicc['log']['path']
+    
+    # Atamos el socket
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         my_socket.connect((ProxyIP, ProxyPort))
         
