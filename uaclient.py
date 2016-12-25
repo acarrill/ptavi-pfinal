@@ -19,7 +19,7 @@ def WriteLogFich(fich, ip, port, event, message):
     Now = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
     
     if event == 'Starting':
-        text = (Now + ' ' +  event + '...')
+        text = (Now + ' ' +  event + '...' + '\r\n')
         Log.write(text)
     elif event == 'Send to':
         text = (Now + ' ' +  event + ' ' + ip + ':' + port + ':' 
@@ -30,13 +30,22 @@ def WriteLogFich(fich, ip, port, event, message):
                 + message + '\r\n')
         Log.write(text)
     elif event == 'Error':
-        text = (Now + event + ':' + message)
+        text = (Now + event + ':' + message + '\r\n')
         Log.write(text)
     elif event == 'Finishing':
-        text = (Now + ' ' +  event + '.')
+        text = (Now + ' ' +  event + '.' + '\r\n')
         Log.write(text)
     Log.close()        
     
+def ToLogFormat(fich, ip, port, event, msn):
+    """
+    Elimina saltos de linea del mensaje y los sustituye por espacios en blanco.
+    Escribe el mensaje utilizando WriteLogFich
+    """
+
+    TextLog = ' '.join(msn.split('\r\n'))
+    WriteLogFich(fich, ip, port, event, msn) 
+
 
 if __name__ == "__main__":
     """
@@ -60,19 +69,43 @@ if __name__ == "__main__":
     ProxyIP = CDicc['regproxy']['ip']
     ProxyPort = int(CDicc['regproxy']['puerto'])
     LogFich = CDicc['log']['path']
+    UserName = CDicc['account']['username']
+    UAServerPort = int(CDicc['uaserver']['puerto'])
     
     # Atamos el socket
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         my_socket.connect((ProxyIP, ProxyPort))
         
         if Method == 'REGISTER':
-            WriteLogFich(LogFich, 'a', 'a', 'Starting', '')
-            Message = (Method + ' sip:' + CDicc['account']['username'] + 
+            ToLogFormat(LogFich, '', '', 'Starting', '')
+            Message = (Method + ' sip:' + Username + 
                        ':' + CDicc['uaserver']['puerto'] +
-                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n\r\n')
-            #Escribir en fichero 'log'
-        
+                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n\r\n') 
+
             
+        elif Method == 'INVITE':
+            Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
+            Message += ('Content-Type: application/sdp\r\n\r\n'
+                        'v=0\r\n' + 'o=' + Username + ' ' + IPCaller + '\r\n'
+                        's=music4betterlife\r\n' + 't=0\r\n' +
+                        'm=audio ' + str(UAServerPort) + 'RTP\r\n')
+                        
+        #REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
+        ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)  
+        
+        data = my_socket.recv(1024)
+        Answer = data.decode('utf-8')
+        OK = ('SIP/2.0 100 Trying\r\n\r\n'  # Invite recibido correctamente
+              'SIP/2.0 180 Ring\r\n\r\n'
+              'SIP/2.0 200 OK\r\n\r\n')
+              
+                            
+        if Answer == OK and Method == 'INVITE':
+            Method = 'ACK'
+            Message = (Method + ' sip:' + ReceiverLogin + '@' +
+                       ReceiverIP + ' SIP/2.0')
+                       
+             
         print("Enviando:", Message)
         my_socket.send(bytes(Message, 'utf-8') + b'\r\n\r\n')
         data = my_socket.recv(1024)

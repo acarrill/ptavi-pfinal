@@ -8,7 +8,7 @@ import socketserver
 import sys
 import os
 import xml.etree.ElementTree as ET
-from uaclient import WriteLogFich
+from uaclient import ToLogFormat
 
 try:  # Tomamos la configuración de la conexión de un xml
     ConfigUA = sys.argv[1]
@@ -40,13 +40,11 @@ class UAHandler(socketserver.DatagramRequestHandler):
         ListReceived = Received.split(' ')  # Lista de la cadena recibida
         ClientMethod = ListReceived[0]
         
-        Text = ' '.join(Received.split('\r\n'))
-        WriteLogFich(LogFich, IPCaller, PortCaller, 'Received from', Text)
+        ToLogFormat(LogFich, IPCaller, PortCaller, 'Received from', Received)
 
         if not ClientMethod in AvailableMethods:
             Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
-            Text = ' '.join(Message.split('\r\n'))
-            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'INVITE':
             InfoRTPCaller['IP'] = ListReceiver[10]
@@ -59,24 +57,21 @@ class UAHandler(socketserver.DatagramRequestHandler):
                         'v=0\r\n' + 'o=' + NameCaller + IPCaller + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
                         'm=audio ' + str(ServerPort) + 'RTP\r\n')
-            Text = ' '.join(Message.split('\r\n'))      
-            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message) 
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message) 
                  
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'BYE':
             Message = 'SIP/2.0 200 OK\r\n\r\n'
-            Text = ' '.join(Message.split('\r\n'))
-            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'ACK':
-            WriteLogFich(LogFich, Caller, PortCaller, 'Sen to', 'RTP Audio')
+            ToLogFormat(LogFich, Caller, PortCaller, 'Sen to', 'RTP Audio')
             ToClientExe = ('./mp32rtp -i' + InfoRTPCaller['IP'] + ' -p ' +
                            InfoRTPCaller['Port'] + ' < ' + Audio)
             os.system(ToClientExe)
         else:
             Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
-            Text = ' '.join(Message.split('\r\n'))
-            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
             
 
