@@ -24,39 +24,73 @@ except IndexError:
 except OSError:
     print("Configuration file not finded. Please fix path and restart")
 
-
-class EchoHandler(socketserver.DatagramRequestHandler):
+class UAHandler(socketserver.DatagramRequestHandler):
     """
     Echo server class
     """
 
+    InfoRTPCaller = {}
+
     def handle(self):
         """Manejador de conexión"""
+        IPCaller = str(self.client_address[0])
+        PortCaller = str(self.client_address[1])
+        
         Received = self.rfile.read().decode('utf-8')
         ListReceived = Received.split(' ')  # Lista de la cadena recibida
         ClientMethod = ListReceived[0]
+        
+        Text = ' '.join(Received.split('\r\n'))
+        WriteLogFich(LogFich, IPCaller, PortCaller, 'Received from', Text)
 
-        if len(ListReceived) != 3 or ListReceived[2] != 'SIP/2.0\r\n\r\n':
-            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+        if not ClientMethod in AvailableMethods:
+            Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
+            Text = ' '.join(Message.split('\r\n'))
+            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'INVITE':
-            self.wfile.write(bytes('SIP/2.0 100 Trying\r\n\r\n'
-                                   'SIP/2.0 180 Ring\r\n\r\n'
-                                   'SIP/2.0 200 OK\r\n\r\n', 'utf-8'))
+            InfoRTPCaller['IP'] = ListReceiver[10]
+            InfoRTPCaller['Port'] = ListReceived[14]
+            
+            Message = ('SIP/2.0 100 Trying\r\n\r\n'
+                      'SIP/2.0 180 Ring\r\n\r\n'
+                      'SIP/2.0 200 OK\r\n')
+            Message += ('Content-Type: application/sdp\r\n\r\n'
+                        'v=0\r\n' + 'o=' + NameCaller + IPCaller + '\r\n'
+                        's=music4betterlife\r\n' + 't=0\r\n' +
+                        'm=audio ' + str(ServerPort) + 'RTP\r\n')
+            Text = ' '.join(Message.split('\r\n'))      
+            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message) 
+                 
+            self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'BYE':
-            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+            Message = 'SIP/2.0 200 OK\r\n\r\n'
+            Text = ' '.join(Message.split('\r\n'))
+            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'ACK':
-            ToClientExe = './mp32rtp -i 127.0.0.1 -p 23032 < ' + Audio
+            WriteLogFich(LogFich, Caller, PortCaller, 'Sen to', 'RTP Audio')
+            ToClientExe = ('./mp32rtp -i' + InfoRTPCaller['IP'] + ' -p ' +
+                           InfoRTPCaller['Port'] + ' < ' + Audio)
             os.system(ToClientExe)
         else:
-            self.wfile.write(b'SIP/2.0 405 Method Not Allowed\r\n\r\n')
+            Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
+            Text = ' '.join(Message.split('\r\n'))
+            WriteLogFich(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            self.wfile.write(bytes(Message, 'utf-8'))
+            
 
-#Parámetros para lanzar el server
+# Parámetros para lanzar el server
 ServerIP = CDicc['uaserver']['ip']
 ServerPort = int(CDicc['uaserver']['puerto'])
+LogFich = CDicc['log']['path']
+Audio = CDicc['audio']['path']
+
+AvailableMethods = ['INVITE', 'ACK', 'BYE']  # Métodos implementados
 
 if __name__ == "__main__":
     # Creamos servidor de eco y escuchamos
-    serv = socketserver.UDPServer((ServerIP, ServerPort), EchoHandler)
+    serv = socketserver.UDPServer((ServerIP, ServerPort), UAHandler)
     print("Lanzando servidor UDP de eco...")
     try:
         serv.serve_forever()
