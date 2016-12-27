@@ -71,6 +71,8 @@ if __name__ == "__main__":
     LogFich = CDicc['log']['path']
     UserName = CDicc['account']['username']
     UAServerPort = int(CDicc['uaserver']['puerto'])
+    UAServerIP = CDicc['uaserver']['ip']
+    
     
     # Atamos el socket
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
@@ -78,40 +80,30 @@ if __name__ == "__main__":
         
         if Method == 'REGISTER':
             ToLogFormat(LogFich, '', '', 'Starting', '')
-            Message = (Method + ' sip:' + Username + 
+            Message = (Method + ' sip:' + UserName + 
                        ':' + CDicc['uaserver']['puerto'] +
-                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n\r\n') 
-
-            
+                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n\r\n')  
         elif Method == 'INVITE':
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
             Message += ('Content-Type: application/sdp\r\n\r\n'
-                        'v=0\r\n' + 'o=' + Username + ' ' + IPCaller + '\r\n'
+                        'v=0\r\n' +
+                        'o=' + UserName + ' ' + UAServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
-                        'm=audio ' + str(UAServerPort) + 'RTP\r\n')
-                        
-        #REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
-        ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)  
-        
-        data = my_socket.recv(1024)
-        Answer = data.decode('utf-8')
-        OK = ('SIP/2.0 100 Trying\r\n\r\n'  # Invite recibido correctamente
-              'SIP/2.0 180 Ring\r\n\r\n'
-              'SIP/2.0 200 OK\r\n\r\n')
-              
-                            
-        if Answer == OK and Method == 'INVITE':
-            Method = 'ACK'
-            Message = (Method + ' sip:' + ReceiverLogin + '@' +
-                       ReceiverIP + ' SIP/2.0')
+                        'm=audio ' + str(UAServerPort) + 'RTP\r\n\r\n')
                        
-             
+        #REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
         print("Enviando:", Message)
-        my_socket.send(bytes(Message, 'utf-8') + b'\r\n\r\n')
+        my_socket.send(bytes(Message, 'utf-8'))
+        ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)  
+        
         data = my_socket.recv(1024)
-        
-        
         Answer = data.decode('utf-8')
-        OK = ('SIP/2.0 100 Trying\r\n\r\n'  # Invite recibido correctamente
-              'SIP/2.0 180 Ring\r\n\r\n'
-              'SIP/2.0 200 OK\r\n\r\n')
+        print(Answer)
+        OK = ('SIP/2.0 200 OK')
+                                  
+        if OK in Answer and Method == 'INVITE':
+            Method = 'ACK'
+            Message = (Method + ' sip:' + Option + ' SIP/2.0') 
+            print("Enviando:", Message)
+            my_socket.send(bytes(Message, 'utf-8') + b'\r\n\r\n')
+

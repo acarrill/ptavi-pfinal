@@ -2,9 +2,9 @@
 
 <config>
     <account username='pink@floyd.UK' passwd='more_60s_music'/>
-    <uaserver ip='' puerto='0420'/>
+    <uaserver ip='127.0.0.1' puerto='1969'/>
     <rtpaudio puerto='2017'/>
-    <regproxy ip='' puerto='1960'/>
-    <log path='./log_ua1.txt'/>
+    <regproxy ip='127.0.0.1' puerto='1960'/>
+    <log path='./log_ua2.txt'/>
     <audio path='./cancion.mp3'/>
-<config/>
+</config>
