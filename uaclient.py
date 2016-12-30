@@ -90,8 +90,11 @@ if __name__ == "__main__":
                         'o=' + UserName + ' ' + UAServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
                         'm=audio ' + str(UAServerPort) + 'RTP\r\n\r\n')
+        elif Method == 'BYE':
+            Message = (Method + ' sip:' + Option + ' SIP/2.0')
+   
                        
-        #REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
+        # REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
         print("Enviando:", Message)
         my_socket.send(bytes(Message, 'utf-8'))
         ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)  

@@ -82,7 +82,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((ip, port))
-        ToLogFormat(LogFich, ip, port, 'Sen to', msn)
+        ToLogFormat(LogFich, ip, port, 'Send to', msn)
         my_socket.send(bytes(msn, 'utf-8'))
         data = my_socket.recv(1024)
         return data
@@ -110,7 +110,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         Received = self.rfile.read().decode('utf-8')
         ReceivedList = Received.split(' ')
         print("El cliente nos manda ", Received)
-
+        ToLogFormat(LogFich, IPClient, PortClient, 'Received from', Received)
 
         ClientMethod = ReceivedList[0]
         self.json2registered()
@@ -142,17 +142,33 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             self.register2json()           
             
         elif ClientMethod == 'INVITE':
+            # Busca ID del invitado, le reenvia; después reenvía su respuesta
             UserInvited = ReceivedList[1].split(':')[1]
             if UserInvited in self.Users:
                 IPInvited = self.Users[UserInvited]['ip']
                 PortInvited = self.Users[UserInvited]['port']
-                            
+
                 AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
-                Answer = AnswerCode.decode('utf-8')
+                Answer = AnswerCode.decode('utf-8')#NO NECESARIO, TRAZA DE PRUEBA
                 print(Answer)
                 
                 self.wfile.write(AnswerCode)
-
+            else:
+                pass # 404
+        elif ClientMethod == 'ACK':
+            # Información de destino
+            UserInvited = ReceivedList[1].split(':')[1]
+            IPInvited = self.Users[UserInvited]['ip']
+            PortInvited = self.Users[UserInvited]['port']
+            AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
+        elif ClientMethod == 'BYE':
+            UserByeByed = ReceivedList[1].split(':')[1]
+            if UserByeByed in self.Users:
+                IPByeByed = self.Users[UserByeByed]['ip']
+                PortByeByed = self.Users[UserByeByed]['port']
+            
+                AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
+                self.wfile.write(AnswerCode)
 
 # Parámetros necesarios para el funcionamiento del proxy
 Port = int(CDicc['server']['puerto'])

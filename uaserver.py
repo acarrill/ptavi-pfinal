@@ -69,10 +69,10 @@ class UAHandler(socketserver.DatagramRequestHandler):
             ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'ACK':
-            ToLogFormat(LogFich, InfoRTPCaller['IP'], 
-                        InfoRTPCaller['Port'], 'Sen to', 'RTP Audio')
-            ToClientExe = ('./mp32rtp -i' + InfoRTPCaller['IP'] + ' -p ' +
-                           InfoRTPCaller['Port'] + ' < ' + Audio)
+            ToLogFormat(LogFich, self.InfoRTPCaller['IP'], 
+                        self.InfoRTPCaller['Port'], 'Sen to', 'RTP Audio')
+            ToClientExe = ('./mp32rtp -i' + self.InfoRTPCaller['IP'] + ' -p ' +
+                           self.InfoRTPCaller['Port'] + ' < ' + Audio)
             os.system(ToClientExe)
         else:
             Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
