@@ -8,7 +8,7 @@ import socket
 import sys
 import xml.etree.ElementTree as ET
 import time
-
+import hashlib
 
 def WriteLogFich(fich, ip, port, event, message):
     """
@@ -17,6 +17,7 @@ def WriteLogFich(fich, ip, port, event, message):
     
     Log = open(fich, 'a')
     Now = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
+    port = str(port) # Nos aseguramos de que no sea un entero
     
     if event == 'Starting':
         text = (Now + ' ' +  event + '...' + '\r\n')
@@ -72,6 +73,7 @@ if __name__ == "__main__":
     UserName = CDicc['account']['username']
     UAServerPort = int(CDicc['uaserver']['puerto'])
     UAServerIP = CDicc['uaserver']['ip']
+    RTPPort = CDicc['rtpaudio']['puerto']
     
     
     # Atamos el socket
@@ -82,31 +84,43 @@ if __name__ == "__main__":
             ToLogFormat(LogFich, '', '', 'Starting', '')
             Message = (Method + ' sip:' + UserName + 
                        ':' + CDicc['uaserver']['puerto'] +
-                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n\r\n')  
+                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n')  
         elif Method == 'INVITE':
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
             Message += ('Content-Type: application/sdp\r\n\r\n'
                         'v=0\r\n' +
                         'o=' + UserName + ' ' + UAServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
-                        'm=audio ' + str(UAServerPort) + 'RTP\r\n\r\n')
+                        'm=audio ' + str(RTPPort) + ' RTP\r\n')
         elif Method == 'BYE':
-            Message = (Method + ' sip:' + Option + ' SIP/2.0')
+            Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
    
                        
         # REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
         print("Enviando:", Message)
-        my_socket.send(bytes(Message, 'utf-8'))
+        my_socket.send(bytes((Message + '\r\n'), 'utf-8'))
         ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)  
         
         data = my_socket.recv(1024)
         Answer = data.decode('utf-8')
         print(Answer)
         OK = ('SIP/2.0 200 OK')
-                                  
-        if OK in Answer and Method == 'INVITE':
+        if 'Unauthorized' in Answer:
+            m = hashlib.md5()
+            Nonce = Answer.split('=')[1]
+            Passwd = CDicc['account']['passwd']
+            m.update(bytes(Nonce + Passwd, 'utf-8'))
+            Response = m.hexdigest()
+            Message += ('Authorization: Digest response="' + Response + '"')
+            ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
+            my_socket.send(bytes(Message, 'utf-8'))
+        elif OK in Answer and Method == 'INVITE':
             Method = 'ACK'
-            Message = (Method + ' sip:' + Option + ' SIP/2.0') 
+            Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n\r\n') 
             print("Enviando:", Message)
-            my_socket.send(bytes(Message, 'utf-8') + b'\r\n\r\n')
-
+            ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
+            my_socket.send(bytes(Message, 'utf-8'))
+        elif OK in Answer and Method == 'BYE':
+            ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Finishing', '')
+            print('Llamada terminada')
+            my_socket.close()

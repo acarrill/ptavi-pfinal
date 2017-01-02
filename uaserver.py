@@ -36,11 +36,11 @@ class UAHandler(socketserver.DatagramRequestHandler):
         """Manejador de conexión"""
         IPCaller = str(self.client_address[0])
         PortCaller = str(self.client_address[1])
-        
+
         Received = self.rfile.read().decode('utf-8')
         ListReceived = Received.split(' ')  # Lista de la cadena recibida
         ClientMethod = ListReceived[0]
-        
+
         ToLogFormat(LogFich, IPCaller, PortCaller, 'Received from', Received)
 
         if not ClientMethod in AvailableMethods:
@@ -61,22 +61,22 @@ class UAHandler(socketserver.DatagramRequestHandler):
                         'o=' + NameCaller + ' ' + IPCaller + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
                         'm=audio ' + str(ServerPort) + ' RTP\r\n\r\n')
-            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message) 
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message) 
                  
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'BYE':
             Message = 'SIP/2.0 200 OK\r\n\r\n'
-            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'ACK':
             ToLogFormat(LogFich, self.InfoRTPCaller['IP'], 
-                        self.InfoRTPCaller['Port'], 'Sen to', 'RTP Audio')
+                        self.InfoRTPCaller['Port'], 'Send to', 'RTP Audio')
             ToClientExe = ('./mp32rtp -i' + self.InfoRTPCaller['IP'] + ' -p ' +
                            self.InfoRTPCaller['Port'] + ' < ' + Audio)
             os.system(ToClientExe)
         else:
             Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
-            ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
             
 

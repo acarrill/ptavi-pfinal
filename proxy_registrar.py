@@ -12,7 +12,8 @@ import time
 import os
 import xml.etree.ElementTree as ET
 from uaclient import ToLogFormat
-
+import hashlib
+import random
 
 
 try:  # Tomamos la configuración del Proxy de un xml
@@ -30,30 +31,31 @@ except OSError:
     print("Configuration file not finded. Please fix path and restart")
 
 
-
 class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     """
     Echo server class
     """
     # Diccionario como atributo de clase
     Users = {}
+    Passwds = {}
+    # Establecemos un nonce para la encriptación
+    Nonce = str(8983747192038)
 
-
-    def json2registered(self):
+    def Json2Dicc(self, fich, dicc):
         """Comprueba la existencia de json, si existe, actualiza diccionario"""
         
         try:
-            with open("registered.json", 'r') as Users_Data:
-                self.Users = json.load(Users_Data)
+            with open(fich, 'r') as Users_Data:
+                dicc = json.load(Users_Data)
         except:
             pass
  
  
-    def register2json(self):
+    def Dicc2Json(self, fich, dicc):
         """Una vez que hay actividad, crea o actualiza fichero json"""
         
-        with open('registered.json', 'w') as Fich_Users:
-            json.dump(self.Users, Fich_Users, sort_keys=True, indent='\t',
+        with open(fich, 'w') as Fich_Users:
+            json.dump(dicc, Fich_Users, sort_keys=True, indent='\t',
                       separators=(',', ':'))
 
 
@@ -100,6 +102,23 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         return ExpiresTime
     
     
+    def Authenticated (self, address, sendedpasswd):
+        """
+        Busca contraseña de cliente y comprueba que su response
+        coincida con el recibido
+        """
+        
+        ClientPasswd = self.Passwds[address]['passwd'] 
+        GoodM = hashlib.md5()
+        TentativeM = hashlib.md5()
+        Goodm.update(bytes(self.Nonce + ClientPasswd, 'utf-8'))
+        TentativeM.update(bytes(self.Nonce + sendedpasswd, 'utf-8'))
+        GoodResponse = GoodM.hexdigest()
+        TentativeResponse = TentativeM.hexdigest() 
+        Authenticater = (TentativeResponse == GoodResponse)
+        return Athenticater
+        
+        
     def handle(self):
         """Nuestro manejador de la conexión"""
         
@@ -113,33 +132,57 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         ToLogFormat(LogFich, IPClient, PortClient, 'Received from', Received)
 
         ClientMethod = ReceivedList[0]
-        self.json2registered()
+        self.Json2Dicc('registered.json', self.Users)
         
-        print(ReceivedList)
-        if ClientMethod == 'REGISTER':
+        if not ClientMethod in AvailableMethods:
+            Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
+            ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+            self.wfile.write(bytes(Message, 'utf-8'))
+
+        elif ClientMethod == 'REGISTER':
             Expires = float(ReceivedList[3].split('\r')[0])
             RegisteredTime = time.strftime('%Y-%m-%d %H:%M:%S',
                                          time.localtime(time.time()))
-                                         
-            PortReceiverClient = int(ReceivedList[1].split(':')[2])
-            
+            PortReceivedClient = int(ReceivedList[1].split(':')[2])
             Addres = ReceivedList[1].split(':')[1]
             print(Addres)
-            self.Users[Addres] = {'ip': self.client_address[0],
-                                  'port': PortReceiverClient,
-                                  'registered': RegisteredTime,
-                                  'expires': Expires}
-     
-            if Expires == 0:
-                print('aaaa')
-                del self.Users[Addres]
+            
+            if 'Authorization' in Received:
+                SendedPasswd = Received.split('=')[1]
+                if Addres in self.Users:  # Existe comprobamos response
+                    if self.Athenticated(Addres, SendedPasswd):
+                        Message = 'SIP/2.0 200 OK\r\n\r\n'
+                        ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                        self.wfile.write(bytes(Message, 'utf-8'))
+                    else:
+                        Message = ('SIP/2.0 401 Unauthorized\r\n' +
+                                   'WWW Authenticate: Digest nonce="' +
+                                    self.Nonce + '"')
+                        ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                        self.wfile.write(bytes(Message, 'utf-8'))
+                else:  # Nuevo usuario, no autentificamos
+                    print('a')
+                    self.Users[Addres] = {'ip': self.client_address[0],
+                                          'port': PortReceivedClient,
+                                          'registered': RegisteredTime,
+                                          'expires': Expires}
+                    self.Dicc2Json('registered.json', self.Users)
+                    Message = 'SIP/2.0 200 OK\r\n\r\n'
+                    ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                    self.wfile.write(bytes(Message, 'utf-8'))
+            else:
+                Message = ('SIP/2.0 401 Unauthorized\r\n' +
+                           'WWW Authenticate: Digest nonce="' +
+                           self.Nonce + '"')
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                self.wfile.write(bytes(Message, 'utf-8'))
+
             # creamos una lista con los usuarios a borrar
-            self.register2json()
             Expire_List = self.deleteUsers()
             print(Expire_List)
             for name in Expire_List:
                 del self.Users[name]
-            self.register2json()           
+            self.Dicc2Json('registered.json', self.Users)           
             
         elif ClientMethod == 'INVITE':
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
@@ -152,15 +195,20 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 Answer = AnswerCode.decode('utf-8')#NO NECESARIO, TRAZA DE PRUEBA
                 print(Answer)
                 
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Answer)
                 self.wfile.write(AnswerCode)
             else:
-                pass # 404
+                Message = "SIP/2.0 404 User Not Found\r\n\r\n"
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                self.wfile.write(bytes(Message, 'utf-8'))
+                
         elif ClientMethod == 'ACK':
             # Información de destino
             UserInvited = ReceivedList[1].split(':')[1]
             IPInvited = self.Users[UserInvited]['ip']
             PortInvited = self.Users[UserInvited]['port']
             AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
+            
         elif ClientMethod == 'BYE':
             UserByeByed = ReceivedList[1].split(':')[1]
             if UserByeByed in self.Users:
@@ -168,11 +216,23 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 PortByeByed = self.Users[UserByeByed]['port']
             
                 AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
+                Answer = AnswerCode.decode('utf-8')
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Answer)
                 self.wfile.write(AnswerCode)
+            else:
+                Message = 'SIP/2.0 404 User Not Found\r\n\r\n'
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                self.wfile.write(bytes(Message, 'utf-8'))
+        else:
+            Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
+            ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+            self.wfile.write(bytes(Message, 'utf-8'))
 
 # Parámetros necesarios para el funcionamiento del proxy
 Port = int(CDicc['server']['puerto'])
 LogFich = CDicc['log']['path']
+
+AvailableMethods = ['REGISTER', 'INVITE', 'ACK', 'BYE']  # Métodos implementados
 
 if __name__ == "__main__":
     serv = socketserver.UDPServer(('', Port), SIPRegisterHandler)
