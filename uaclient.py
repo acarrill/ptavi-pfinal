@@ -119,9 +119,9 @@ if __name__ == "__main__":
             Passwd = CDicc['account']['passwd']
             m.update(bytes(Nonce + Passwd, 'utf-8'))
             Response = m.hexdigest()
-            Message += ('Authorization: Digest response="' + Response + '"')
+            Message += ('Authorization: Digest response=' + Response)
             ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
-            my_socket.send(bytes(Message, 'utf-8'))
+            my_socket.send(bytes((Message + '\r\n\r\n'), 'utf-8'))
         elif OK in Answer and Method == 'REGISTER':
             print('Registrado correctamente en servidor proxy')
         elif OK in Answer and Method == 'INVITE':

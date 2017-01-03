@@ -40,13 +40,18 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     # Establecemos un nonce para la encriptación
     Nonce = str(8983747192038)
 
-    def Json2Dicc(self, fich):
-        """Comprueba la existencia de json, si existe, actualiza diccionario"""
+    def Json2Dicc(self, fich, dicc):
+        """Comprueba la existencia de json.
+        Si existe, actualiza el diccionario indicado
+        """
         
         try:
             with open(fich, 'r') as Users_Data:
-                dicc = json.load(Users_Data)
-                return(dicc)
+                if dicc == 'Users':
+                    print('a')
+                    self.Users = json.load(Users_Data)
+                elif dicc == 'Passwds':
+                    self.Passwds = json.load(Users_Data)
         except:
             pass
  
@@ -132,8 +137,8 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         ToLogFormat(LogFich, IPClient, PortClient, 'Received from', Received)
 
         ClientMethod = ReceivedList[0]
-        self.Users = self.Json2Dicc('registered.json')
-        self.Passwds = self.Json2Dicc('passwords.json')
+        self.Json2Dicc('registered.json', 'Users')
+        self.Json2Dicc('passwords.json', 'Passwds')
         
         if not ClientMethod in AvailableMethods:
             Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
@@ -149,10 +154,11 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             print(Addres)
             
             if 'Authorization' in Received:
-                SendedPasswd = Received.split('=')[1].split('"')[1]
+                SendedPasswd = Received.split('=')[1].split('\r')[0]
                 print(SendedPasswd)
                 if Addres in self.Users:  # Existe comprobamos response
                     if self.Authenticated(Addres, SendedPasswd):
+                        print('la cagatis')
                         Message = 'SIP/2.0 200 OK\r\n\r\n'
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
@@ -162,10 +168,16 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                               'expires': Expires}
                         if Expires == 0:
                             del self.Users[Addres]
+                            del self.Passwds[Addres]                            
+                        Expire_List = self.deleteUsers()
+                        print(Expire_List)
+                        for name in Expire_List:
+                            del self.Users[name]
+                            del self.Passwds[name]
                     else:  # Reintente autorización
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
-                                   'WWW Authenticate: Digest nonce="' +
-                                    self.Nonce + '"')
+                                   'WWW Authenticate: Digest nonce=' +
+                                    self.Nonce + '\r\n\r\n')
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
                 else:  # Nuevo usuario
@@ -174,8 +186,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                           'registered': RegisteredTime,
                                           'expires': Expires}
                     self.Passwds[Addres] = {'passwd': SendedPasswd}
-                    self.Dicc2Json('registered.json', self.Users)
-                    self.Dicc2Json('passwords.json', self.Passwds)
+
                     Message = 'SIP/2.0 200 OK\r\n\r\n'
                     ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                     self.wfile.write(bytes(Message, 'utf-8'))
@@ -186,10 +197,9 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                 self.wfile.write(bytes(Message, 'utf-8'))          
             # Actualizamos la base de datos
-            Expire_List = self.deleteUsers()
-            for name in Expire_List:
-                del self.Users[name]
-            self.Dicc2Json('registered.json', self.Users) 
+            self.Dicc2Json('registered.json', self.Users)
+            self.Dicc2Json('passwords.json', self.Passwds)
+            
         elif ClientMethod == 'INVITE':
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
             UserInvited = ReceivedList[1].split(':')[1]
