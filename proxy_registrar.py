@@ -13,7 +13,6 @@ import os
 import xml.etree.ElementTree as ET
 from uaclient import ToLogFormat
 import hashlib
-import random
 
 
 try:  # Tomamos la configuración del Proxy de un xml
@@ -111,12 +110,12 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         ClientPasswd = self.Passwds[address]['passwd'] 
         GoodM = hashlib.md5()
         TentativeM = hashlib.md5()
-        Goodm.update(bytes(self.Nonce + ClientPasswd, 'utf-8'))
+        GoodM.update(bytes(self.Nonce + ClientPasswd, 'utf-8'))
         TentativeM.update(bytes(self.Nonce + sendedpasswd, 'utf-8'))
         GoodResponse = GoodM.hexdigest()
         TentativeResponse = TentativeM.hexdigest() 
         Authenticater = (TentativeResponse == GoodResponse)
-        return Athenticater
+        return Authenticater
         
         
     def handle(self):
@@ -133,6 +132,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
 
         ClientMethod = ReceivedList[0]
         self.Json2Dicc('registered.json', self.Users)
+        self.Json2Dicc('passwords.json', self.Passwds)
         
         if not ClientMethod in AvailableMethods:
             Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
@@ -148,25 +148,33 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             print(Addres)
             
             if 'Authorization' in Received:
-                SendedPasswd = Received.split('=')[1]
+                SendedPasswd = Received.split('=')[1].split('"')[1]
+                print(SendedPasswd)
                 if Addres in self.Users:  # Existe comprobamos response
-                    if self.Athenticated(Addres, SendedPasswd):
+                    if self.Authenticated(Addres, SendedPasswd):
                         Message = 'SIP/2.0 200 OK\r\n\r\n'
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
+                        self.Users[Addres] = {'ip': self.client_address[0],
+                                              'port': PortReceivedClient,
+                                              'registered': RegisteredTime,
+                                              'expires': Expires}
+                        if Expires == 0:
+                            del self.Users[Addres]
                     else:
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce="' +
                                     self.Nonce + '"')
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
-                else:  # Nuevo usuario, no autentificamos
-                    print('a')
+                else:  # Nuevo usuario
                     self.Users[Addres] = {'ip': self.client_address[0],
                                           'port': PortReceivedClient,
                                           'registered': RegisteredTime,
                                           'expires': Expires}
+                    self.Passwds[Addres] = {'passwd': SendedPasswd}
                     self.Dicc2Json('registered.json', self.Users)
+                    self.Dicc2Json('passwords.json', self.Passwds)
                     Message = 'SIP/2.0 200 OK\r\n\r\n'
                     ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                     self.wfile.write(bytes(Message, 'utf-8'))
@@ -175,15 +183,13 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                            'WWW Authenticate: Digest nonce="' +
                            self.Nonce + '"')
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
-                self.wfile.write(bytes(Message, 'utf-8'))
-
-            # creamos una lista con los usuarios a borrar
+                self.wfile.write(bytes(Message, 'utf-8'))          
+            # Actualizamos la base de datos
             Expire_List = self.deleteUsers()
             print(Expire_List)
             for name in Expire_List:
                 del self.Users[name]
-            self.Dicc2Json('registered.json', self.Users)           
-            
+            self.Dicc2Json('registered.json', self.Users) 
         elif ClientMethod == 'INVITE':
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
             UserInvited = ReceivedList[1].split(':')[1]
