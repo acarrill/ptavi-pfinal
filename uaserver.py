@@ -21,9 +21,9 @@ try:  # Tomamos la configuración de la conexión de un xml
     for child in ConfigRoot:
         CDicc[child.tag] = child.attrib  # Diccionario doble 
 except IndexError:
-    print("Usage: python uaserver.py config")
+    sys.exit("Usage: python uaserver.py config")
 except OSError:
-    print("Configuration file not finded. Please fix path and restart")
+    sys.exit("Configuration file not finded. Please fix path and restart")
 
 class UAHandler(socketserver.DatagramRequestHandler):
     """
@@ -81,7 +81,10 @@ class UAHandler(socketserver.DatagramRequestHandler):
             
 
 # Parámetros para lanzar el server
+
 ServerIP = CDicc['uaserver']['ip']
+if ServerIP == '':
+    ServerIP = '127.0.0.1'
 ServerPort = int(CDicc['uaserver']['puerto'])
 MyRTPPort = CDicc['rtpaudio']['puerto']
 MyUserName = CDicc['account']['username']
@@ -104,4 +107,4 @@ if __name__ == "__main__":
     try:
         serv.serve_forever()
     except KeyboardInterrupt:
-        print("Finalizado servidor")
+        sys.exit("Finalizado servidor")

@@ -25,9 +25,9 @@ try:  # Tomamos la configuración del Proxy de un xml
     for child in ConfigRoot:
         CDicc[child.tag] = child.attrib  # Diccionario doble 
 except IndexError:
-    print("Usage: python proxy_registrar.py config")
+    sys.exit("Usage: python proxy_registrar.py config")
 except OSError:
-    print("Configuration file not finded. Please fix path and restart")
+    sys.exit("Configuration file not finded. Please fix path and restart")
 
 
 class SIPRegisterHandler(socketserver.DatagramRequestHandler):
@@ -40,12 +40,13 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     # Establecemos un nonce para la encriptación
     Nonce = str(8983747192038)
 
-    def Json2Dicc(self, fich, dicc):
+    def Json2Dicc(self, fich):
         """Comprueba la existencia de json, si existe, actualiza diccionario"""
         
         try:
             with open(fich, 'r') as Users_Data:
                 dicc = json.load(Users_Data)
+                return(dicc)
         except:
             pass
  
@@ -131,8 +132,8 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         ToLogFormat(LogFich, IPClient, PortClient, 'Received from', Received)
 
         ClientMethod = ReceivedList[0]
-        self.Json2Dicc('registered.json', self.Users)
-        self.Json2Dicc('passwords.json', self.Passwds)
+        self.Users = self.Json2Dicc('registered.json')
+        self.Passwds = self.Json2Dicc('passwords.json')
         
         if not ClientMethod in AvailableMethods:
             Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
@@ -186,7 +187,6 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 self.wfile.write(bytes(Message, 'utf-8'))          
             # Actualizamos la base de datos
             Expire_List = self.deleteUsers()
-            print(Expire_List)
             for name in Expire_List:
                 del self.Users[name]
             self.Dicc2Json('registered.json', self.Users) 
@@ -198,7 +198,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 PortInvited = self.Users[UserInvited]['port']
 
                 AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
-                Answer = AnswerCode.decode('utf-8')#NO NECESARIO, TRAZA DE PRUEBA
+                Answer = AnswerCode.decode('utf-8')
                 print(Answer)
                 
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Answer)
@@ -235,15 +235,18 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             self.wfile.write(bytes(Message, 'utf-8'))
 
 # Parámetros necesarios para el funcionamiento del proxy
+IP = CDicc['server']['ip']
+if IP == '':
+    IP = '127.0.0.1'
 Port = int(CDicc['server']['puerto'])
 LogFich = CDicc['log']['path']
 
 AvailableMethods = ['REGISTER', 'INVITE', 'ACK', 'BYE']  # Métodos implementados
 
 if __name__ == "__main__":
-    serv = socketserver.UDPServer(('', Port), SIPRegisterHandler)
+    serv = socketserver.UDPServer((IP, Port), SIPRegisterHandler)
     print("Lanzando servidor UDP de eco...")
     try:
         serv.serve_forever()
     except KeyboardInterrupt:
-        print("Finalizado servidor")
+        sys.exit("Finalizado servidor")

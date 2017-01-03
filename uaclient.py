@@ -18,7 +18,7 @@ def WriteLogFich(fich, ip, port, event, message):
     
     Log = open(fich, 'a')
     Now = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
-    port = str(port) # Nos aseguramos de que no sea un entero
+    port = str(port) # Nos aseguramos de no introducir un entero
     
     if event == 'Starting':
         text = (Now + ' ' +  event + '...' + '\r\n')
@@ -32,8 +32,10 @@ def WriteLogFich(fich, ip, port, event, message):
                 + message + '\r\n')
         Log.write(text)
     elif event == 'Error':
-        text = (Now + event + ':' + message + '\r\n')
+        text = (Now + ' ' + event + ':' + message + ip + ' port ' + 
+                port + '\r\n')
         Log.write(text)
+        sys.exit(text)  # Informamos en la shell
     elif event == 'Finishing':
         text = (Now + ' ' +  event + '.' + '\r\n')
         Log.write(text)
@@ -67,7 +69,7 @@ if __name__ == "__main__":
         for child in ConfigRoot:
             CDicc[child.tag] = child.attrib      
     except IndexError:
-        print("Usage: python client.py config method option")
+        sys.exit("Usage: python client.py config method option")
     ProxyIP = CDicc['regproxy']['ip']
     ProxyPort = int(CDicc['regproxy']['puerto'])
     LogFich = CDicc['log']['path']
@@ -100,9 +102,14 @@ if __name__ == "__main__":
         # REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
         print("Enviando:", Message)
         my_socket.send(bytes((Message + '\r\n'), 'utf-8'))
-        ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)  
+        ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)  
         
-        data = my_socket.recv(1024)
+        try:
+            data = my_socket.recv(1024)
+        except socket.error:
+            ErrorMsn = " No server listening at "
+            ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Error', ErrorMsn)
+        
         Answer = data.decode('utf-8')
         print(Answer)
         OK = ('SIP/2.0 200 OK')
@@ -113,7 +120,7 @@ if __name__ == "__main__":
             m.update(bytes(Nonce + Passwd, 'utf-8'))
             Response = m.hexdigest()
             Message += ('Authorization: Digest response="' + Response + '"')
-            ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
+            ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
             my_socket.send(bytes(Message, 'utf-8'))
         elif OK in Answer and Method == 'REGISTER':
             print('Registrado correctamente en servidor proxy')
