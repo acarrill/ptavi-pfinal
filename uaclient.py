@@ -9,6 +9,7 @@ import sys
 import xml.etree.ElementTree as ET
 import time
 import hashlib
+import os
 
 def WriteLogFich(fich, ip, port, event, message):
     """
@@ -73,8 +74,8 @@ if __name__ == "__main__":
     UserName = CDicc['account']['username']
     UAServerPort = int(CDicc['uaserver']['puerto'])
     UAServerIP = CDicc['uaserver']['ip']
-    RTPPort = CDicc['rtpaudio']['puerto']
-    
+    MyRTPPort = CDicc['rtpaudio']['puerto']
+    Audio = CDicc['audio']['path']
     
     # Atamos el socket
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
@@ -91,7 +92,7 @@ if __name__ == "__main__":
                         'v=0\r\n' +
                         'o=' + UserName + ' ' + UAServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
-                        'm=audio ' + str(RTPPort) + ' RTP\r\n')
+                        'm=audio ' + str(MyRTPPort) + ' RTP\r\n')
         elif Method == 'BYE':
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
    
@@ -114,12 +115,22 @@ if __name__ == "__main__":
             Message += ('Authorization: Digest response="' + Response + '"')
             ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
             my_socket.send(bytes(Message, 'utf-8'))
+        elif OK in Answer and Method == 'REGISTER':
+            print('Registrado correctamente en servidor proxy')
         elif OK in Answer and Method == 'INVITE':
+            # ACK
             Method = 'ACK'
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n\r\n') 
             print("Enviando:", Message)
             ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
             my_socket.send(bytes(Message, 'utf-8'))
+            # Envío RTP
+            HisRTPPort = Answer.split(' ')[9]
+            HisRTPIP = Answer.split(' ')[8].split('\r')[0]
+            ToLogFormat(LogFich, HisRTPIP, HisRTPPort, 'Send to', 'RTP Audio')
+            ToClientExe = ('./mp32rtp -i' + HisRTPIP + ' -p ' +
+                           HisRTPPort + ' < ' + Audio)
+            os.system(ToClientExe)
         elif OK in Answer and Method == 'BYE':
             ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Finishing', '')
             print('Llamada terminada')

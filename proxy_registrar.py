@@ -161,7 +161,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                               'expires': Expires}
                         if Expires == 0:
                             del self.Users[Addres]
-                    else:
+                    else:  # Reintente autorización
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce="' +
                                     self.Nonce + '"')

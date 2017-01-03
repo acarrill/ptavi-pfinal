@@ -58,9 +58,9 @@ class UAHandler(socketserver.DatagramRequestHandler):
                       'SIP/2.0 200 OK\r\n')
             Message += ('Content-Type: application/sdp\r\n\r\n'
                         'v=0\r\n' + 
-                        'o=' + NameCaller + ' ' + IPCaller + '\r\n'
+                        'o=' + MyUserName + ' ' + ServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
-                        'm=audio ' + str(ServerPort) + ' RTP\r\n\r\n')
+                        'm=audio ' + str(MyRTPPort) + ' RTP\r\n\r\n')
             ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message) 
                  
             self.wfile.write(bytes(Message, 'utf-8'))
@@ -83,6 +83,8 @@ class UAHandler(socketserver.DatagramRequestHandler):
 # Parámetros para lanzar el server
 ServerIP = CDicc['uaserver']['ip']
 ServerPort = int(CDicc['uaserver']['puerto'])
+MyRTPPort = CDicc['rtpaudio']['puerto']
+MyUserName = CDicc['account']['username']
 LogFich = CDicc['log']['path']
 Audio = CDicc['audio']['path']
 # Proxy
