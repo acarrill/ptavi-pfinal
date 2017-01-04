@@ -50,7 +50,7 @@ def ToLogFormat(fich, ip, port, event, msn):
     """
 
     TextLog = ' '.join(msn.split('\r\n'))
-    WriteLogFich(fich, ip, port, event, msn)
+    WriteLogFich(fich, ip, port, event, TextLog)
 
 
 if __name__ == "__main__":
