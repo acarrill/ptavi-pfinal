@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Clase (y programa principal) para un servidor de eco en UDP simple
+Servidor proxy con autentificación para una sesión basada en SIP
 """
 
 import socketserver
@@ -41,7 +41,8 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     Nonce = str(8983747192038)
 
     def Json2Dicc(self, fich, dicc):
-        """Comprueba la existencia de json.
+        """
+        Comprueba la existencia de json.
         Si existe, actualiza el diccionario indicado
         """
         
@@ -137,6 +138,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         ToLogFormat(LogFich, IPClient, PortClient, 'Received from', Received)
 
         ClientMethod = ReceivedList[0]
+        Addres = ReceivedList[1].split(':')[1]
         self.Json2Dicc('registered.json', 'Users')
         self.Json2Dicc('passwords.json', 'Passwds')
         
@@ -150,13 +152,12 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             RegisteredTime = time.strftime('%Y-%m-%d %H:%M:%S',
                                          time.localtime(time.time()))
             PortReceivedClient = int(ReceivedList[1].split(':')[2])
-            Addres = ReceivedList[1].split(':')[1]
             print(Addres)
             
             if 'Authorization' in Received:
                 SendedPasswd = Received.split('=')[1].split('\r')[0]
                 print(SendedPasswd)
-                if Addres in self.Users:  # Existe comprobamos response
+                if Addres in self.Passwds:  # Existe; comprobamos response
                     if self.Authenticated(Addres, SendedPasswd):
                         print('la cagatis')
                         Message = 'SIP/2.0 200 OK\r\n\r\n'
@@ -174,20 +175,14 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                         for name in Expire_List:
                             del self.Users[name]
                             del self.Passwds[name]
-                    else:  # Reintente autorización
+                    else:  # No autorizado
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce=' +
                                     self.Nonce + '\r\n\r\n')
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
-                else:  # Nuevo usuario
-                    self.Users[Addres] = {'ip': self.client_address[0],
-                                          'port': PortReceivedClient,
-                                          'registered': RegisteredTime,
-                                          'expires': Expires}
-                    self.Passwds[Addres] = {'passwd': SendedPasswd}
-
-                    Message = 'SIP/2.0 200 OK\r\n\r\n'
+                else:  # No existe ese usuario
+                    Message = 'SIP/2.0 404 User Not Found\r\n\r\n'
                     ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                     self.wfile.write(bytes(Message, 'utf-8'))
             else:
@@ -198,9 +193,8 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 self.wfile.write(bytes(Message, 'utf-8'))          
             # Actualizamos la base de datos
             self.Dicc2Json('registered.json', self.Users)
-            self.Dicc2Json('passwords.json', self.Passwds)
             
-        elif ClientMethod == 'INVITE':
+        elif (ClientMethod == 'INVITE' or ClientMethod == 'BYE'):
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
             UserInvited = ReceivedList[1].split(':')[1]
             if UserInvited in self.Users:
@@ -225,20 +219,6 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             PortInvited = self.Users[UserInvited]['port']
             AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
             
-        elif ClientMethod == 'BYE':
-            UserByeByed = ReceivedList[1].split(':')[1]
-            if UserByeByed in self.Users:
-                IPByeByed = self.Users[UserByeByed]['ip']
-                PortByeByed = self.Users[UserByeByed]['port']
-            
-                AnswerCode = self.ReSend(IPInvited, PortInvited, Received)
-                Answer = AnswerCode.decode('utf-8')
-                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Answer)
-                self.wfile.write(AnswerCode)
-            else:
-                Message = 'SIP/2.0 404 User Not Found\r\n\r\n'
-                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
-                self.wfile.write(bytes(Message, 'utf-8'))
         else:
             Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
             ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
