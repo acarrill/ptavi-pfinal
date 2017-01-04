@@ -169,12 +169,10 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                               'expires': Expires}
                         if Expires == 0:
                             del self.Users[Addres]
-                            del self.Passwds[Addres]                            
                         Expire_List = self.deleteUsers()
                         print(Expire_List)
                         for name in Expire_List:
                             del self.Users[name]
-                            del self.Passwds[name]
                     else:  # No autorizado
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce=' +
