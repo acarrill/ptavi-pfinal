@@ -11,36 +11,38 @@ import time
 import hashlib
 import os
 
+
 def WriteLogFich(fich, ip, port, event, message):
     """
     Función que transcribe el proceso de conexión en un fichero de texto
     """
-    
+
     Log = open(fich, 'a')
     Now = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
-    port = str(port) # Nos aseguramos de no introducir un entero
-    
+    port = str(port)  # Nos aseguramos de no introducir un entero
+
     if event == 'Starting':
-        text = (Now + ' ' +  event + '...' + '\r\n')
+        text = (Now + ' ' + event + '...' + '\r\n')
         Log.write(text)
     elif event == 'Send to':
-        text = (Now + ' ' +  event + ' ' + ip + ':' + port + ':' 
-                + message + '\r\n')
+        text = (Now + ' ' + event + ' ' + ip + ':' + port + ':' +
+                message + '\r\n')
         Log.write(text)
     elif event == 'Received from':
-        text = (Now + ' ' +  event + ' ' + ip + ':' + port + ':' 
-                + message + '\r\n')
+        text = (Now + ' ' + event + ' ' + ip + ':' + port + ':' +
+                message + '\r\n')
         Log.write(text)
     elif event == 'Error':
-        text = (Now + ' ' + event + ':' + message + ip + ' port ' + 
+        text = (Now + ' ' + event + ':' + message + ip + ' port ' +
                 port + '\r\n')
         Log.write(text)
         sys.exit(text)  # Informamos en la shell
     elif event == 'Finishing':
-        text = (Now + ' ' +  event + '.' + '\r\n')
+        text = (Now + ' ' + event + '.' + '\r\n')
         Log.write(text)
-    Log.close()        
-    
+    Log.close()
+
+
 def ToLogFormat(fich, ip, port, event, msn):
     """
     Elimina saltos de linea del mensaje y los sustituye por espacios en blanco.
@@ -48,7 +50,7 @@ def ToLogFormat(fich, ip, port, event, msn):
     """
 
     TextLog = ' '.join(msn.split('\r\n'))
-    WriteLogFich(fich, ip, port, event, msn) 
+    WriteLogFich(fich, ip, port, event, msn)
 
 
 if __name__ == "__main__":
@@ -57,7 +59,7 @@ if __name__ == "__main__":
     Se ata el socket a un proxy (servidor de registro)... UDP
     Usa varios métodos de sesión SIP
     """
-    
+
     # Parámetros para configuración y ejecuación del UA.
     try:
         Method = sys.argv[2].upper()  # Método
@@ -67,7 +69,7 @@ if __name__ == "__main__":
         ConfigRoot = ConfigTree.getroot()
         CDicc = {}  # Diccionario doble con los parámetros
         for child in ConfigRoot:
-            CDicc[child.tag] = child.attrib      
+            CDicc[child.tag] = child.attrib
     except IndexError:
         sys.exit("Usage: python client.py config method option")
     ProxyIP = CDicc['regproxy']['ip']
@@ -78,16 +80,16 @@ if __name__ == "__main__":
     UAServerIP = CDicc['uaserver']['ip']
     MyRTPPort = CDicc['rtpaudio']['puerto']
     Audio = CDicc['audio']['path']
-    
+
     # Atamos el socket
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         my_socket.connect((ProxyIP, ProxyPort))
-        
+
         if Method == 'REGISTER':
             ToLogFormat(LogFich, '', '', 'Starting', '')
-            Message = (Method + ' sip:' + UserName + 
+            Message = (Method + ' sip:' + UserName +
                        ':' + CDicc['uaserver']['puerto'] +
-                      ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n')  
+                       ' SIP/2.0\r\n' + 'Expires: ' + Option + '\r\n')
         elif Method == 'INVITE':
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
             Message += ('Content-Type: application/sdp\r\n\r\n'
@@ -97,19 +99,18 @@ if __name__ == "__main__":
                         'm=audio ' + str(MyRTPPort) + ' RTP\r\n')
         elif Method == 'BYE':
             Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n')
-   
-                       
+
         # REVISAR SI ES NECESARIO AQUI O MÁS ADELANTE
         print("Enviando:", Message)
         my_socket.send(bytes((Message + '\r\n'), 'utf-8'))
-        ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)  
-        
+        ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
+
         try:
             data = my_socket.recv(1024)
         except socket.error:
             ErrorMsn = " No server listening at "
             ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Error', ErrorMsn)
-        
+
         Answer = data.decode('utf-8')
         print(Answer)
         OK = ('SIP/2.0 200 OK')
@@ -122,14 +123,14 @@ if __name__ == "__main__":
             Message += ('Authorization: Digest response=' + Response)
             ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
             my_socket.send(bytes((Message + '\r\n\r\n'), 'utf-8'))
-            
+
         elif OK in Answer and Method == 'REGISTER':
             print('Registrado correctamente en servidor proxy')
-            
+
         elif OK in Answer and Method == 'INVITE':
             # ACK
             Method = 'ACK'
-            Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n\r\n') 
+            Message = (Method + ' sip:' + Option + ' SIP/2.0\r\n\r\n')
             print("Enviando:", Message)
             ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Send to', Message)
             my_socket.send(bytes(Message, 'utf-8'))
@@ -140,7 +141,7 @@ if __name__ == "__main__":
             ToClientExe = ('./mp32rtp -i' + HisRTPIP + ' -p ' +
                            HisRTPPort + ' < ' + Audio)
             os.system(ToClientExe)
-            
+
         elif OK in Answer and Method == 'BYE':
             ToLogFormat(LogFich, ProxyIP, str(ProxyPort), 'Finishing', '')
             print('Llamada terminada')

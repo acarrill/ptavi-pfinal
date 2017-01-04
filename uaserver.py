@@ -19,11 +19,12 @@ try:  # Tomamos la configuración de la conexión de un xml
     ConfigRoot = ConfigTree.getroot()
     CDicc = {}  # C = Config
     for child in ConfigRoot:
-        CDicc[child.tag] = child.attrib  # Diccionario doble 
+        CDicc[child.tag] = child.attrib  # Diccionario doble
 except IndexError:
     sys.exit("Usage: python uaserver.py config")
 except OSError:
     sys.exit("Configuration file not finded. Please fix path and restart")
+
 
 class UAHandler(socketserver.DatagramRequestHandler):
     """
@@ -43,7 +44,7 @@ class UAHandler(socketserver.DatagramRequestHandler):
 
         ToLogFormat(LogFich, IPCaller, PortCaller, 'Received from', Received)
 
-        if not ClientMethod in AvailableMethods:
+        if ClientMethod not in AvailableMethods:
             Message = 'SIP/2.0 405 Method Not Allowed\r\n\r\n'
             ToLogFormat(LogFich, IPCaller, PortCaller, 'Sen to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
@@ -52,24 +53,24 @@ class UAHandler(socketserver.DatagramRequestHandler):
             self.InfoRTPCaller['IP'] = ListReceived[4].split('\r')[0]
             self.InfoRTPCaller['Port'] = ListReceived[5].split('\r')[0]
             NameCaller = ListReceived[1].split(':')[1]
-            
+
             Message = ('SIP/2.0 100 Trying\r\n\r\n'
-                      'SIP/2.0 180 Ring\r\n\r\n'
-                      'SIP/2.0 200 OK\r\n')
+                       'SIP/2.0 180 Ring\r\n\r\n'
+                       'SIP/2.0 200 OK\r\n')
             Message += ('Content-Type: application/sdp\r\n\r\n'
-                        'v=0\r\n' + 
+                        'v=0\r\n' +
                         'o=' + MyUserName + ' ' + ServerIP + '\r\n'
                         's=music4betterlife\r\n' + 't=0\r\n' +
                         'm=audio ' + str(MyRTPPort) + ' RTP\r\n\r\n')
-            ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message) 
-                 
+            ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message)
+
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'BYE':
             Message = 'SIP/2.0 200 OK\r\n\r\n'
             ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
         elif ClientMethod == 'ACK':
-            ToLogFormat(LogFich, self.InfoRTPCaller['IP'], 
+            ToLogFormat(LogFich, self.InfoRTPCaller['IP'],
                         self.InfoRTPCaller['Port'], 'Send to', 'RTP Audio')
             ToClientExe = ('./mp32rtp -i' + self.InfoRTPCaller['IP'] + ' -p ' +
                            self.InfoRTPCaller['Port'] + ' < ' + Audio)
@@ -78,7 +79,6 @@ class UAHandler(socketserver.DatagramRequestHandler):
             Message = 'SIP/2.0 400 Bad Request\r\n\r\n'
             ToLogFormat(LogFich, IPCaller, PortCaller, 'Send to', Message)
             self.wfile.write(bytes(Message, 'utf-8'))
-            
 
 # Parámetros para lanzar el server
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     my_socket.connect((ProxyIP, ProxyPort))
-    
+
     serv = socketserver.UDPServer((ServerIP, ServerPort), UAHandler)
     print("Lanzando servidor UDP de eco...")
     try:
