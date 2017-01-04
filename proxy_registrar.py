@@ -108,7 +108,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         return ExpiresTime
     
     
-    def Authenticated (self, address, sendedpasswd):
+    def Authenticated (self, address, ClientResponse):
         """
         Busca contraseña de cliente y comprueba que su response
         coincida con el recibido
@@ -116,12 +116,11 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         
         ClientPasswd = self.Passwds[address]['passwd'] 
         GoodM = hashlib.md5()
-        TentativeM = hashlib.md5()
         GoodM.update(bytes(self.Nonce + ClientPasswd, 'utf-8'))
-        TentativeM.update(bytes(self.Nonce + sendedpasswd, 'utf-8'))
         GoodResponse = GoodM.hexdigest()
-        TentativeResponse = TentativeM.hexdigest() 
-        Authenticater = (TentativeResponse == GoodResponse)
+        print(ClientPasswd)
+        print(GoodResponse)
+        Authenticater = (ClientResponse == GoodResponse)
         return Authenticater
         
         
@@ -155,10 +154,10 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             print(Addres)
             
             if 'Authorization' in Received:
-                SendedPasswd = Received.split('=')[1].split('\r')[0]
-                print(SendedPasswd)
+                ClientResponse = Received.split('=')[1].split('\r')[0]
+                print(ClientResponse)
                 if Addres in self.Passwds:  # Existe; comprobamos response
-                    if self.Authenticated(Addres, SendedPasswd):
+                    if self.Authenticated(Addres, ClientResponse):
                         print('la cagatis')
                         Message = 'SIP/2.0 200 OK\r\n\r\n'
                         ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
@@ -169,10 +168,6 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                               'expires': Expires}
                         if Expires == 0:
                             del self.Users[Addres]
-                        Expire_List = self.deleteUsers()
-                        print(Expire_List)
-                        for name in Expire_List:
-                            del self.Users[name]
                     else:  # No autorizado
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce=' +
@@ -185,15 +180,20 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                     self.wfile.write(bytes(Message, 'utf-8'))
             else:
                 Message = ('SIP/2.0 401 Unauthorized\r\n' +
-                           'WWW Authenticate: Digest nonce="' +
-                           self.Nonce + '"')
+                           'WWW Authenticate: Digest nonce=' +
+                           self.Nonce + '\r\n\r\n')
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                 self.wfile.write(bytes(Message, 'utf-8'))          
             # Actualizamos la base de datos
+            Expire_List = self.deleteUsers()
+            print(Expire_List)
+            for name in Expire_List:
+                 del self.Users[name]
             self.Dicc2Json('registered.json', self.Users)
             
         elif (ClientMethod == 'INVITE' or ClientMethod == 'BYE'):
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
+            # Función homóloga en caso de BYE
             UserInvited = ReceivedList[1].split(':')[1]
             if UserInvited in self.Users:
                 IPInvited = self.Users[UserInvited]['ip']
