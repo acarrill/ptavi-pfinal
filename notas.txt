@@ -1,4 +1,3 @@
 Para el reestablecimiento de usuarios conectados uso un fichero json. 
-Este fichero es actualizado con cada método "registrar" recibido en el servidor,
-si el servidor se cae, 
+Este fichero es actualizado con cada método "registrar" recibido en el servidor, si el servidor se cae, 
 se asigna este fichero al diccionario doble que sirve como estructura de datos para usuarios al proxy.
