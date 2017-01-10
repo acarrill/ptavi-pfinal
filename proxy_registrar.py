@@ -13,7 +13,7 @@ import os
 import xml.etree.ElementTree as ET
 from uaclient import ToLogFormat
 import hashlib
-
+import random
 
 try:  # Tomamos la configuración del Proxy de un xml
     ConfigProxy = sys.argv[1]
@@ -37,8 +37,6 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     # Diccionario como atributo de clase
     Users = {}
     Passwds = {}
-    # Establecemos un nonce para la encriptación
-    Nonce = str(8983747192038)
 
     def Json2Dicc(self, fich, dicc):
         """
@@ -111,10 +109,10 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         """
 
         ClientPasswd = self.Passwds[address]['passwd']
+        ClientNonce = self.Passwds[address]['nonce']
         GoodM = hashlib.md5()
-        GoodM.update(bytes(self.Nonce + ClientPasswd, 'utf-8'))
+        GoodM.update(bytes(ClientNonce + ClientPasswd, 'utf-8'))
         GoodResponse = GoodM.hexdigest()
-        print(ClientPasswd)
         print(GoodResponse)
         Authenticater = (ClientResponse == GoodResponse)
         return Authenticater
@@ -149,10 +147,9 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
 
             if 'Authorization' in Received:
                 ClientResponse = Received.split('=')[1].split('\r')[0]
-                print(ClientResponse)
                 if Addres in self.Passwds:  # Existe; comprobamos response
                     if self.Authenticated(Addres, ClientResponse):
-                        print('la cagatis')
+                        print('Autentificado')
                         Message = 'SIP/2.0 200 OK\r\n\r\n'
                         ToLogFormat(LogFich, IPClient, PortClient,
                                     'Send to', Message)
@@ -166,7 +163,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                     else:  # No autorizado
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce=' +
-                                   self.Nonce + '\r\n\r\n')
+                                   self.Passwds[Addres]['nonce'] + '\r\n\r\n')
                         ToLogFormat(LogFich, IPClient, PortClient,
                                     'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
@@ -176,9 +173,13 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                                 'Send to', Message)
                     self.wfile.write(bytes(Message, 'utf-8'))
             else:
+                Nonce = str(random.randint(0, 10**20))
+                if Addres in self.Passwds:
+                    self.Passwds[Addres]['nonce'] = Nonce
+                    self.Dicc2Json('passwords.json', self.Passwds)
                 Message = ('SIP/2.0 401 Unauthorized\r\n' +
                            'WWW Authenticate: Digest nonce=' +
-                           self.Nonce + '\r\n\r\n')
+                           Nonce + '\r\n\r\n')
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
                 self.wfile.write(bytes(Message, 'utf-8'))
             # Actualizamos la base de datos
