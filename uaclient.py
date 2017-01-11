@@ -114,7 +114,7 @@ if __name__ == "__main__":
         Answer = data.decode('utf-8')
         print(Answer)
         OK = ('SIP/2.0 200 OK')
-        if 'Unauthorized' in Answer:
+        if 'Unauthorized' in Answer and Method == 'REGISTER':
             Nonce = Answer.split('=')[1].split('\r')[0]
             Passwd = CDicc['account']['passwd']
             m = hashlib.md5()
@@ -123,7 +123,10 @@ if __name__ == "__main__":
             Message += ('Authorization: Digest response=' + Response)
             ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
             my_socket.send(bytes((Message + '\r\n\r\n'), 'utf-8'))
-
+        
+        elif 'Unauthorized' in Answer and Method != 'REGISTER':
+            print('Servidor proxy requiere registro y autentificación ' +
+                  'utilice método "register" antes de ninguna acción ')
         elif OK in Answer and Method == 'REGISTER':
             print('Registrado correctamente en servidor proxy')
 

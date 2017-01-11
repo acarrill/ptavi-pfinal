@@ -161,9 +161,12 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                         if Expires == 0:
                             del self.Users[Addres]
                     else:  # No autorizado
+                        Nonce = str(random.randint(0, 10**20))
+                        self.Passwds[Addres]['nonce'] = Nonce
+                        self.Dicc2Json('passwords.json', self.Passwds)
                         Message = ('SIP/2.0 401 Unauthorized\r\n' +
                                    'WWW Authenticate: Digest nonce=' +
-                                   self.Passwds[Addres]['nonce'] + '\r\n\r\n')
+                                   Nonce + '\r\n\r\n')
                         ToLogFormat(LogFich, IPClient, PortClient,
                                     'Send to', Message)
                         self.wfile.write(bytes(Message, 'utf-8'))
@@ -193,7 +196,15 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             # Busca ID del invitado, le reenvia; después reenvía su respuesta
             # Función homóloga en caso de BYE
             UserInvited = ReceivedList[1].split(':')[1]
-            if UserInvited in self.Users:
+            UserCaller = ReceivedList[3].split('=')[2]
+            if UserCaller not in self.Users:
+                Nonce = str(random.randint(0, 10**20))
+                Message = ('SIP/2.0 401 Unauthorized\r\n' +
+                           'WWW Authenticate: Digest nonce=' +
+                           Nonce + '\r\n\r\n')
+                ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
+                self.wfile.write(bytes(Message, 'utf-8')) 
+            elif UserInvited in self.Users:
                 IPInvited = self.Users[UserInvited]['ip']
                 PortInvited = self.Users[UserInvited]['port']
 
