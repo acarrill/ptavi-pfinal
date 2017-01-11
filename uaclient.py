@@ -123,7 +123,7 @@ if __name__ == "__main__":
             Message += ('Authorization: Digest response=' + Response)
             ToLogFormat(LogFich, ProxyIP, ProxyPort, 'Send to', Message)
             my_socket.send(bytes((Message + '\r\n\r\n'), 'utf-8'))
-        
+
         elif 'Unauthorized' in Answer and Method != 'REGISTER':
             print('Servidor proxy requiere registro y autentificación ' +
                   'utilice método "register" antes de ninguna acción ')

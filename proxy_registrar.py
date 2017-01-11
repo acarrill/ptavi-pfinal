@@ -203,7 +203,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                            'WWW Authenticate: Digest nonce=' +
                            Nonce + '\r\n\r\n')
                 ToLogFormat(LogFich, IPClient, PortClient, 'Send to', Message)
-                self.wfile.write(bytes(Message, 'utf-8')) 
+                self.wfile.write(bytes(Message, 'utf-8'))
             elif UserInvited in self.Users:
                 IPInvited = self.Users[UserInvited]['ip']
                 PortInvited = self.Users[UserInvited]['port']
